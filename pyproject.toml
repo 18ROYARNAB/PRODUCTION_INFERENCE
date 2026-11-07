@@ -1,0 +1,35 @@
+[project]
+name = "production-inference"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+authors = [
+    { name = "Roy", email = "123065491+18ROYARNAB@users.noreply.github.com" }
+]
+requires-python = ">=3.12"
+dependencies = [
+    "fastapi>=0.141.1",
+    "httpx>=0.28.1",
+    "pydantic>=2.13.5",
+    "qdrant-client>=1.14.2",
+    "fastembed",
+    "redis>=8.1.0",
+    "uvicorn[standard]>=0.54.0",
+    "python-dotenv>=1.0.1",
+    "PyJWT[crypto]>=2.10.1",
+    "ijson>=3.3.0",
+    "python-multipart",
+    "langfuse",
+]
+
+[project.optional-dependencies]
+evaluation = [
+    "deepeval>=3.0.0",
+]
+
+[project.scripts]
+production-inference = "production_inference:main"
+
+[build-system]
+requires = ["uv_build>=0.12.5,<0.13.0"]
+build-backend = "uv_build"

@@ -1,0 +1,345 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#f5f7fb" />
+    <title>Signal Desk | Production Inference</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+      tailwind.config = {
+        theme: {
+          extend: {
+            colors: {
+              ink: "#162033",
+              muted: "#68758b",
+              canvas: "#f5f7fb",
+              brand: "#3157d5",
+              line: "#e3e8f1",
+            },
+            boxShadow: {
+              panel: "0 18px 60px rgba(24, 39, 75, 0.08)",
+            },
+          },
+        },
+      };
+    </script>
+    <style>
+      :root { color-scheme: light; }
+      body {
+        background:
+          radial-gradient(ellipse at 9% 0%, rgba(49, 87, 213, .09), transparent 34rem),
+          #f5f7fb;
+      }
+      .scrollbar-thin { scrollbar-width: thin; scrollbar-color: #cbd5e1 transparent; }
+    </style>
+  </head>
+  <body class="min-h-screen text-ink antialiased">
+    <div class="mx-auto min-h-screen max-w-[1440px] px-4 py-5 sm:px-8 lg:px-12">
+      <header class="flex items-center justify-between border-b border-line/80 pb-5">
+        <a href="/" class="flex items-center gap-3" aria-label="Signal Desk home">
+          <span class="grid h-10 w-10 place-items-center rounded-xl bg-brand text-white shadow-lg shadow-brand/20">
+            <svg viewBox="0 0 24 24" fill="none" class="h-5 w-5" aria-hidden="true">
+              <path d="M4 13h4l2.2-7L14 19l2.2-6H20" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+          </span>
+          <span>
+            <span class="block text-sm font-bold tracking-tight">Signal Desk</span>
+            <span class="block text-xs text-muted">Production inference</span>
+          </span>
+        </a>
+        <div class="flex items-center gap-2 rounded-full border border-line bg-white/80 px-3 py-1.5 text-xs font-medium text-muted">
+          <span class="relative flex h-2 w-2">
+            <span id="health-ping" class="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-50"></span>
+            <span id="health-dot" class="relative inline-flex h-2 w-2 rounded-full bg-emerald-500"></span>
+          </span>
+          <span id="health-label">Checking service</span>
+        </div>
+      </header>
+
+      <main class="grid gap-8 py-8 lg:grid-cols-[minmax(0,1fr)_320px] lg:py-12">
+        <section>
+          <div class="mb-8 max-w-2xl">
+            <p class="mb-3 text-xs font-bold uppercase tracking-[.18em] text-brand">Security intelligence workspace</p>
+            <h1 class="text-3xl font-bold tracking-tight sm:text-4xl">Investigate with your incident data.</h1>
+            <p class="mt-3 text-base leading-7 text-muted">
+              Search CVEs directly or ask a question. Responses use authorized records from your knowledge base.
+            </p>
+          </div>
+
+          <section class="overflow-hidden rounded-2xl border border-line bg-white shadow-panel">
+            <div class="flex border-b border-line px-4 sm:px-6" role="tablist" aria-label="Request mode">
+              <button id="chat-tab" class="mode-tab border-b-2 border-brand px-4 py-4 text-sm font-semibold text-brand" type="button" role="tab" aria-selected="true" aria-controls="request-panel">
+                Ask a question
+              </button>
+              <button id="search-tab" class="mode-tab border-b-2 border-transparent px-4 py-4 text-sm font-semibold text-muted hover:text-ink" type="button" role="tab" aria-selected="false" aria-controls="request-panel">
+                Search records
+              </button>
+            </div>
+
+            <div class="p-4 sm:p-6">
+              <div id="request-panel" role="tabpanel">
+                <label id="query-label" for="query-input" class="mb-2 block text-sm font-semibold">What would you like to know?</label>
+                <textarea id="query-input" rows="4" class="w-full resize-y rounded-xl border border-line bg-slate-50/70 px-4 py-3 text-sm leading-6 outline-none transition placeholder:text-slate-400 focus:border-brand focus:bg-white focus:ring-4 focus:ring-brand/10" placeholder="e.g. What is the impact and fix for CVE-2026-21428?" autocomplete="off"></textarea>
+                <div class="mt-3 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                  <div class="flex flex-wrap items-center gap-3">
+                    <p class="text-xs text-muted">Try a CVE ID for an exact record lookup.</p>
+                    <button id="new-chat-button" type="button" class="hidden rounded-lg px-2 py-1 text-xs font-semibold text-brand hover:bg-blue-50">New conversation</button>
+                  </div>
+                  <button id="submit-button" type="button" class="inline-flex items-center justify-center gap-2 rounded-xl bg-brand px-5 py-3 text-sm font-semibold text-white shadow-md shadow-brand/20 transition hover:bg-blue-700 focus:outline-none focus:ring-4 focus:ring-brand/20 disabled:cursor-not-allowed disabled:opacity-60">
+                    <svg id="submit-icon" viewBox="0 0 24 24" fill="none" class="h-4 w-4" aria-hidden="true">
+                      <path d="m5 12 14-7-5 14-2-6-7-1Z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/>
+                    </svg>
+                    <span id="submit-label">Ask Signal Desk</span>
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            <div id="error-banner" class="mx-4 mb-4 hidden rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-800 sm:mx-6" role="alert"></div>
+
+            <section id="result-section" class="hidden border-t border-line bg-slate-50/60 p-4 sm:p-6" aria-live="polite">
+              <div class="mb-4 flex flex-wrap items-center justify-between gap-3">
+                <h2 id="result-heading" class="text-sm font-bold">Response</h2>
+                <div class="flex items-center gap-2">
+                  <span id="hit-count" class="rounded-full bg-white px-3 py-1 text-xs font-medium text-muted ring-1 ring-line"></span>
+                  <span id="cache-badge" class="rounded-full px-3 py-1 text-xs font-semibold"></span>
+                </div>
+              </div>
+              <div id="answer-card" class="mb-4 hidden rounded-xl border border-line bg-white p-4 text-sm leading-7 text-ink"></div>
+              <div id="context-list" class="scrollbar-thin grid max-h-[34rem] gap-3 overflow-y-auto"></div>
+            </section>
+          </section>
+
+          <p class="mt-4 text-center text-xs text-muted">
+            Search uses hybrid semantic + keyword retrieval. Results respect your access level.
+          </p>
+        </section>
+
+        <aside class="space-y-4">
+          <section class="rounded-2xl border border-line bg-white p-5 shadow-panel">
+            <div class="mb-4 flex items-start justify-between gap-3">
+              <div>
+                <h2 class="text-sm font-bold">Connection</h2>
+                <p class="mt-1 text-xs leading-5 text-muted">Enter your bearer token to use the search and chat APIs.</p>
+              </div>
+              <span class="rounded-lg bg-blue-50 p-2 text-brand">
+                <svg viewBox="0 0 24 24" fill="none" class="h-4 w-4" aria-hidden="true">
+                  <rect x="4" y="10" width="16" height="11" rx="2" stroke="currentColor" stroke-width="1.8"/>
+                  <path d="M8 10V7a4 4 0 1 1 8 0v3m-4 5v2" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+                </svg>
+              </span>
+            </div>
+            <label for="token-input" class="mb-2 block text-xs font-semibold text-muted">API access credential</label>
+            <div class="flex gap-2">
+              <input id="token-input" type="password" class="min-w-0 flex-1 rounded-lg border border-line bg-slate-50 px-3 py-2.5 text-sm outline-none focus:border-brand focus:ring-4 focus:ring-brand/10" placeholder="Paste token" autocomplete="off" spellcheck="false" />
+              <button id="token-visibility" type="button" class="rounded-lg border border-line px-3 text-xs font-semibold text-muted hover:bg-slate-50" aria-label="Show token">Show</button>
+            </div>
+            <p class="mt-2 text-[11px] leading-5 text-muted">Kept only in this page session; it is not saved to browser storage.</p>
+          </section>
+
+          <section class="rounded-2xl border border-line bg-white p-5 shadow-panel">
+            <h2 class="text-sm font-bold">Quick start</h2>
+            <ol class="mt-4 space-y-4 text-xs leading-5 text-muted">
+              <li class="flex gap-3"><span class="grid h-6 w-6 shrink-0 place-items-center rounded-full bg-blue-50 font-bold text-brand">1</span><span>Add your OIDC bearer token above. Local development may use the configured development token.</span></li>
+              <li class="flex gap-3"><span class="grid h-6 w-6 shrink-0 place-items-center rounded-full bg-blue-50 font-bold text-brand">2</span><span>Search with a CVE identifier or describe the issue in plain language.</span></li>
+              <li class="flex gap-3"><span class="grid h-6 w-6 shrink-0 place-items-center rounded-full bg-blue-50 font-bold text-brand">3</span><span>Review the retrieved context and cache status alongside the response.</span></li>
+            </ol>
+          </section>
+
+          <a href="/docs" class="flex items-center justify-between rounded-xl border border-line bg-white px-4 py-3 text-sm font-semibold text-ink transition hover:border-brand/30 hover:shadow-panel">
+            <span>Open API documentation</span>
+            <svg viewBox="0 0 24 24" fill="none" class="h-4 w-4 text-muted" aria-hidden="true">
+              <path d="M7 17 17 7M8 7h9v9" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+          </a>
+        </aside>
+      </main>
+      <footer class="border-t border-line/80 py-5 text-center text-xs text-muted">Signal Desk · Production Inference</footer>
+    </div>
+
+    <script>
+      (() => {
+        const state = { mode: "chat", loading: false, conversationId: null };
+        const elements = {
+          chatTab: document.getElementById("chat-tab"),
+          searchTab: document.getElementById("search-tab"),
+          query: document.getElementById("query-input"),
+          queryLabel: document.getElementById("query-label"),
+          submit: document.getElementById("submit-button"),
+          submitLabel: document.getElementById("submit-label"),
+          newChat: document.getElementById("new-chat-button"),
+          token: document.getElementById("token-input"),
+          tokenVisibility: document.getElementById("token-visibility"),
+          error: document.getElementById("error-banner"),
+          results: document.getElementById("result-section"),
+          heading: document.getElementById("result-heading"),
+          hitCount: document.getElementById("hit-count"),
+          cacheBadge: document.getElementById("cache-badge"),
+          answer: document.getElementById("answer-card"),
+          context: document.getElementById("context-list"),
+          healthDot: document.getElementById("health-dot"),
+          healthPing: document.getElementById("health-ping"),
+          healthLabel: document.getElementById("health-label"),
+        };
+
+        function selectMode(mode) {
+          state.mode = mode;
+          const chatSelected = mode === "chat";
+          elements.chatTab.setAttribute("aria-selected", String(chatSelected));
+          elements.searchTab.setAttribute("aria-selected", String(!chatSelected));
+          elements.chatTab.className = `mode-tab border-b-2 px-4 py-4 text-sm font-semibold ${chatSelected ? "border-brand text-brand" : "border-transparent text-muted hover:text-ink"}`;
+          elements.searchTab.className = `mode-tab border-b-2 px-4 py-4 text-sm font-semibold ${!chatSelected ? "border-brand text-brand" : "border-transparent text-muted hover:text-ink"}`;
+          elements.queryLabel.textContent = chatSelected ? "What would you like to know?" : "Search your incident records";
+          elements.query.placeholder = chatSelected
+            ? "e.g. What is the impact and fix for CVE-2026-21428?"
+            : "e.g. CVE-2026-21428 or remote header injection";
+          elements.submitLabel.textContent = chatSelected ? "Ask Signal Desk" : "Search records";
+          elements.newChat.classList.toggle("hidden", !chatSelected);
+          elements.query.focus();
+        }
+
+        function renderContext(items) {
+          elements.context.replaceChildren();
+          if (!Array.isArray(items) || items.length === 0) {
+            const empty = document.createElement("div");
+            empty.className = "rounded-xl border border-dashed border-line bg-white px-4 py-6 text-center text-sm text-muted";
+            empty.textContent = "No authorized matching records were found.";
+            elements.context.append(empty);
+            return;
+          }
+          items.forEach((item, index) => {
+            const card = document.createElement("article");
+            card.className = "rounded-xl border border-line bg-white p-4";
+            const label = document.createElement("p");
+            label.className = "mb-2 text-[11px] font-bold uppercase tracking-wider text-muted";
+            label.textContent = `Retrieved record ${index + 1}`;
+            const content = document.createElement("p");
+            content.className = "whitespace-pre-wrap break-words text-sm leading-6 text-ink";
+            content.textContent = String(item);
+            card.append(label, content);
+            elements.context.append(card);
+          });
+        }
+
+        function setLoading(loading) {
+          state.loading = loading;
+          elements.submit.disabled = loading;
+          elements.submitLabel.textContent = loading
+            ? "Working…"
+            : state.mode === "chat" ? "Ask Signal Desk" : "Search records";
+        }
+
+        function showError(message) {
+          elements.error.textContent = message;
+          elements.error.classList.remove("hidden");
+        }
+
+        function getErrorMessage(body, status) {
+          const detail = body && body.detail;
+          if (typeof detail === "string") return detail;
+          if (Array.isArray(detail)) {
+            return detail.map((item) => item.msg || "Invalid request").join("; ");
+          }
+          if (status === 401) return "Your token is missing or invalid. Check the bearer token and try again.";
+          if (status === 403) return "Your account does not have permission to view these records.";
+          if (status === 429) return "Request limit reached. Wait a minute and try again.";
+          return `Request failed (HTTP ${status}).`;
+        }
+
+        async function submitQuery() {
+          if (state.loading) return;
+          const query = elements.query.value.trim();
+          if (!query) {
+            showError("Enter a question or search term first.");
+            elements.query.focus();
+            return;
+          }
+          const token = elements.token.value.trim();
+          if (!token) {
+            showError("Enter your bearer token in the Connection panel first.");
+            elements.token.focus();
+            return;
+          }
+
+          elements.error.classList.add("hidden");
+          elements.results.classList.add("hidden");
+          setLoading(true);
+          try {
+            const chatMode = state.mode === "chat";
+            const response = await fetch(chatMode ? "/chat" : "/search", {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+                "Authorization": `Bearer ${token}`,
+              },
+              body: JSON.stringify(chatMode
+                ? { prompt: query, conversation_id: state.conversationId }
+                : { query }),
+            });
+            let body;
+            try {
+              body = await response.json();
+            } catch {
+              throw new Error(`The API returned an unreadable response (HTTP ${response.status}).`);
+            }
+            if (!response.ok) throw new Error(getErrorMessage(body, response.status));
+
+            if (chatMode && typeof body.conversation_id === "string") {
+              state.conversationId = body.conversation_id;
+            }
+            elements.heading.textContent = chatMode ? "Answer" : "Matching records";
+            elements.hitCount.textContent = `${body.hits_found ?? 0} ${body.hits_found === 1 ? "record" : "records"}`;
+            elements.cacheBadge.textContent = body.cache_hit ? "CACHE HIT" : "CACHE MISS";
+            elements.cacheBadge.className = `rounded-full px-3 py-1 text-xs font-semibold ${body.cache_hit ? "bg-emerald-50 text-emerald-700" : "bg-amber-50 text-amber-700"}`;
+            if (chatMode && typeof body.model_output === "string") {
+              elements.answer.textContent = body.model_output;
+              elements.answer.classList.remove("hidden");
+            } else {
+              elements.answer.textContent = "";
+              elements.answer.classList.add("hidden");
+            }
+            renderContext(body.safe_context);
+            elements.results.classList.remove("hidden");
+            elements.results.scrollIntoView({ behavior: "smooth", block: "nearest" });
+          } catch (error) {
+            showError(error instanceof Error ? error.message : "An unexpected request error occurred.");
+          } finally {
+            setLoading(false);
+          }
+        }
+
+        elements.chatTab.addEventListener("click", () => selectMode("chat"));
+        elements.searchTab.addEventListener("click", () => selectMode("search"));
+        elements.submit.addEventListener("click", submitQuery);
+        elements.newChat.addEventListener("click", () => {
+          state.conversationId = null;
+          elements.query.value = "";
+          elements.error.classList.add("hidden");
+          elements.results.classList.add("hidden");
+          elements.query.focus();
+        });
+        elements.query.addEventListener("keydown", (event) => {
+          if (event.key === "Enter" && (event.metaKey || event.ctrlKey)) submitQuery();
+        });
+        elements.tokenVisibility.addEventListener("click", () => {
+          const show = elements.token.type === "password";
+          elements.token.type = show ? "text" : "password";
+          elements.tokenVisibility.textContent = show ? "Hide" : "Show";
+          elements.tokenVisibility.setAttribute("aria-label", show ? "Hide token" : "Show token");
+        });
+
+        fetch("/health")
+          .then((response) => {
+            if (!response.ok) throw new Error("Service unavailable");
+            elements.healthLabel.textContent = "Service online";
+          })
+          .catch(() => {
+            elements.healthDot.className = "relative inline-flex h-2 w-2 rounded-full bg-rose-500";
+            elements.healthPing.classList.add("hidden");
+            elements.healthLabel.textContent = "Service unavailable";
+          });
+      })();
+    </script>
+  </body>
+</html>

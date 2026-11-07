@@ -1,0 +1,144 @@
+x-qdrant-common: &qdrant-common
+  image: "${QDRANT_IMAGE:-qdrant/qdrant:v1.19.0}"
+  restart: unless-stopped
+  environment:
+    QDRANT__CLUSTER__ENABLED: "true"
+  networks:
+    - qdrant_cluster
+
+services:
+  rate-limiter-cache:
+    image: redis:alpine
+    command: ["redis-server", "--appendonly", "yes"]
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    restart: unless-stopped
+
+  qdrant_node_1:
+    <<: *qdrant-common
+    ports:
+      - "6333:6333"
+      - "6334:6334"
+      - "6335:6335"
+    command: ["./qdrant", "--uri", "http://qdrant_node_1:6335"]
+    volumes:
+      - ./qdrant_data_1:/qdrant/storage
+    networks:
+      - default
+      - qdrant_cluster
+
+  qdrant_node_2:
+    <<: *qdrant-common
+    ports:
+      - "6336:6333"
+      - "6337:6334"
+      - "6338:6335"
+    command:
+      [
+        "./qdrant",
+        "--bootstrap",
+        "http://qdrant_node_1:6335",
+        "--uri",
+        "http://qdrant_node_2:6335",
+      ]
+    volumes:
+      - ./qdrant_data_2:/qdrant/storage
+    depends_on:
+      - qdrant_node_1
+    networks:
+      - default
+      - qdrant_cluster
+  qdrant_node_3:
+    <<: *qdrant-common
+    ports:
+      - "6339:6333"
+      - "6340:6334"
+      - "6341:6335"
+    command:
+      [
+        "./qdrant",
+        "--bootstrap",
+        "http://qdrant_node_1:6335",
+        "--uri",
+        "http://qdrant_node_3:6335",
+      ]
+    volumes:
+      - ./qdrant_data_3:/qdrant/storage
+    depends_on:
+      - qdrant_node_1
+    networks:
+      - default
+      - qdrant_cluster
+
+  # llm-engine:
+  #   image: ollama/ollama:latest
+  #   ports:
+  #     - "11434:11434"
+  #   volumes:
+  #     - ollama_models:/root/.ollama
+  #   restart: unless-stopped
+
+  api:
+    build: .
+    deploy:
+      replicas: 3
+    environment:
+      INGEST_STORAGE_DIR: /var/lib/production-inference/uploads
+      REDIS_URL: redis://rate-limiter-cache:6379/0
+    env_file:
+      - .env
+    volumes:
+      - ingest_storage:/var/lib/production-inference/uploads
+    networks:
+      - default
+      - qdrant_cluster
+    depends_on:
+      rate-limiter-cache:
+        condition: service_healthy
+      qdrant_node_1:
+        condition: service_started
+    restart: unless-stopped
+
+  ingestion-worker:
+    build: .
+    command: ["python", "-m", "production_inference.ingestion.worker"]
+    environment:
+      INGEST_STORAGE_DIR: /var/lib/production-inference/uploads
+      REDIS_URL: redis://rate-limiter-cache:6379/0
+    env_file:
+      - .env
+    volumes:
+      - ingest_storage:/var/lib/production-inference/uploads
+    networks:
+      - default
+      - qdrant_cluster
+    depends_on:
+      rate-limiter-cache:
+        condition: service_healthy
+      qdrant_node_1:
+        condition: service_started
+    restart: unless-stopped
+
+  load-balancer:
+    image: nginx:alpine
+    ports:
+      - "8000:80"
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./frontend:/usr/share/nginx/html:ro
+    depends_on:
+      - api
+    restart: unless-stopped
+
+volumes:
+  ingest_storage:
+  redis_data:
+
+networks:
+  qdrant_cluster:
+    driver: bridge
